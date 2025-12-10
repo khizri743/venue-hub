@@ -1,0 +1,133 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+//generator client {
+//  provider = "prisma-client"
+//  output   = "../app/generated/prisma"
+//}
+
+//datasource db {
+//  provider = "postgresql"
+//}
+
+// 1. Configuration
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // or "mongodb" if you prefer
+}
+
+// 2. Enums (Fixed choices)
+enum Role {
+  CUSTOMER
+  VENDOR
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+// 3. Models
+
+model User {
+  id            String    @id @default(cuid()) // Unique ID (e.g., 'clo...')
+  name          String?
+  email         String    @unique
+  password      String?   // Optional because of Google Login
+  phone         String?
+  image         String?   // Profile picture
+  role          Role      @default(CUSTOMER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relationships
+  venues        Venue[]   @relation("VendorVenues") // If user is a vendor
+  bookings      Booking[] // Bookings made by this user
+  reviews       Review[]  // Reviews written by this user
+}
+
+model Venue {
+  id            String    @id @default(cuid())
+  name          String
+  description   String    @db.Text
+  address       String
+  city          String    // For "Search by location"
+  capacity      Int       // e.g., 500 guests
+  price         Float     // e.g., 150000
+  priceUnit     String    @default("per Event") // or "per Hour"
+  coverImage    String    // Main image for the card
+  images        String[]  // Array of image URLs for the gallery
+  amenities     String[]  // e.g., ["Wifi", "Parking", "Catering"]
+  
+  // Stats
+  averageRating Float     @default(0)
+  reviewCount   Int       @default(0)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relationships
+  vendorId      String
+  vendor        User      @relation("VendorVenues", fields: [vendorId], references: [id])
+  
+  categoryId    String
+  category      Category  @relation(fields: [categoryId], references: [id])
+  
+  bookings      Booking[]
+  reviews       Review[]
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique // e.g., "Weddings", "Corporate"
+  slug      String   @unique // e.g., "weddings" (for URLs)
+  image     String?  // The background image for the category card
+  
+  venues    Venue[]
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  date        DateTime      // Date of the event
+  guestCount  Int
+  totalPrice  Float
+  status      BookingStatus @default(PENDING)
+  
+  createdAt   DateTime      @default(now())
+
+  // Relationships
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  
+  venueId     String
+  venue       Venue         @relation(fields: [venueId], references: [id])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      // 1 to 5
+  comment   String?
+  createdAt DateTime @default(now())
+
+  // Relationships
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  venueId   String
+  venue     Venue    @relation(fields: [venueId], references: [id])
+}
+
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
