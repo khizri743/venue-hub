@@ -112,6 +112,16 @@ async function main() {
     }
   })
 
+    await prisma.user.create({
+    data: {
+        email: 'admin@venuehub.com',
+        name: 'Super Admin',
+        role: 'ADMIN',
+        // In real app, hash this password!
+        password: 'adminpassword', 
+    }
+  })
+
   console.log('✅ Seeding complete!')
 }
 
