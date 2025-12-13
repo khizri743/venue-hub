@@ -1,23 +1,29 @@
 "use server"
-import { prisma } from '../lib/prisma';
+import { prisma } from '../lib/prisma'
+import { revalidatePath } from 'next/cache'
 
 export async function getAdminDashboardData() {
   try {
-    // Run all queries in parallel for speed
-    const [users, venues, stats] = await Promise.all([
-      // 1. Get All Users (sorted by newest)
-      prisma.user.findMany({
-        orderBy: { createdAt: 'desc' },
-        select: { id: true, name: true, email: true, role: true, createdAt: true }
-      }),
+    const [users, venues, bookings, stats] = await Promise.all([
+      // 1. Users
+      prisma.user.findMany({ orderBy: { createdAt: 'desc' } }),
       
-      // 2. Get All Venues
-      prisma.venue.findMany({
+      // 2. Venues
+      prisma.venue.findMany({ 
         orderBy: { createdAt: 'desc' },
-        include: { vendor: { select: { name: true } } } // Include vendor name
+        include: { vendor: { select: { name: true } } }
       }),
 
-      // 3. Calculate Counts
+      // 3. BOOKINGS (New) - Include related User and Venue info
+      prisma.booking.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: {
+            user: { select: { name: true, email: true } },
+            venue: { select: { name: true } }
+        }
+      }),
+
+      // 4. Stats
       {
         totalUsers: await prisma.user.count(),
         totalVendors: await prisma.user.count({ where: { role: 'VENDOR' } }),
@@ -27,11 +33,11 @@ export async function getAdminDashboardData() {
       }
     ]);
 
-    return { success: true, users, venues, stats };
+    return { success: true, users, venues, bookings, stats };
 
   } catch (error) {
     console.error("Admin Fetch Error:", error);
-    return { success: false, error: "Failed to load admin data" };
+    return { success: false, error: "Failed to load data" };
   }
 }
 
@@ -57,5 +63,18 @@ export async function deleteVenue(venueId: string) {
         return { success: true };
     } catch (error) {
         return { success: false, error: "Failed to delete venue" };
+    }
+}
+
+export async function updateBookingStatus(bookingId: string, status: 'CONFIRMED' | 'CANCELLED') {
+    try {
+        await prisma.booking.update({
+            where: { id: bookingId },
+            data: { status }
+        });
+        revalidatePath('/admin');
+        return { success: true };
+    } catch (error) {
+        return { success: false, error: "Failed to update booking" };
     }
 }
